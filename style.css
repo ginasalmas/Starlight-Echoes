@@ -1,0 +1,461 @@
+:root {
+  --space-dark: #0A1128;
+  --space-indigo: #0F172A;
+  --teal-cyan: #38bdf8;
+  --card-bg: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  /* Use the galaxy photo as background */
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    url('/galaxy-bg.png') center center / cover no-repeat fixed;
+  background-color: #0A1128;
+  font-family: 'Nanum Pen Script', 'Caveat', cursive;
+  color: #fff;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+}
+
+/* ═══════════════════════════════════
+   Canvas (stars/effects on top of bg image)
+   ═══════════════════════════════════ */
+#cosmic-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Remove the CSS nebula overlay — the photo IS the nebula */
+#nebula-overlay {
+  display: none;
+}
+
+/* ═══════════════════════════════════
+   Title
+   ═══════════════════════════════════ */
+#title-text {
+  position: absolute;
+  top: 30px;
+  right: 50px;
+  font-size: 2rem;
+  color: #bae6fd;
+  text-shadow: 0 0 15px rgba(56, 189, 248, 0.8), 0 0 40px rgba(56, 189, 248, 0.3);
+  z-index: 10;
+  font-family: 'Nanum Pen Script', cursive;
+  letter-spacing: 2px;
+}
+
+/* ═══════════════════════════════════
+   Orbits
+   ═══════════════════════════════════ */
+#orbit-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 100vh;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.orbit-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 5px solid rgba(56, 189, 248, 0.12);
+  border-radius: 50%;
+}
+
+/* ═══════════════════════════════════
+   Central Profile (NO ripple/pulse)
+   ═══════════════════════════════════ */
+#central-profile {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#central-profile img {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 3px solid rgba(186, 230, 253, 0.9);
+  object-fit: cover;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 25px 8px rgba(56, 189, 248, 0.35);
+}
+
+.profile-name {
+  font-size: 1.5rem;
+  color: #e0f2fe;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+}
+
+/* ═══════════════════════════════════
+   Write Button (centered under profile)
+   ═══════════════════════════════════ */
+#open-modal-btn {
+  background: rgba(56, 189, 248, 0.15);
+  color: #bae6fd;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  padding: 8px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Nanum Pen Script', cursive;
+  font-size: 1.4rem;
+  transition: all 0.3s ease;
+  z-index: 100;
+  backdrop-filter: blur(5px);
+}
+
+#open-modal-btn:hover {
+  background: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+  color: #fff;
+}
+
+/* ═══════════════════════════════════
+   Modal — GLASSMORPHISM
+   ═══════════════════════════════════ */
+#message-modal-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  perspective: 1200px;
+}
+
+#message-modal-container.hidden {
+  display: none;
+}
+
+#message-modal {
+  margin-left: 550px;
+
+  /* Glassmorphism */
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 25px;
+  width: 320px;
+  height: 380px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  position: relative;
+  transform-origin: center center;
+  transition: width 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+#message-modal.expanded {
+  width: 580px;
+}
+
+.modal-content-wrapper {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 20px;
+  transition: opacity 0.3s ease;
+}
+
+.modal-content-wrapper.hidden {
+  opacity: 0;
+}
+
+.modal-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  opacity: 1;
+  transition: opacity 0.3s ease 0.3s, transform 0.4s ease;
+  transform: translateX(0);
+}
+
+.modal-left.hidden {
+  display: none;
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.boarding-pass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.bp-header {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bp-line {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+}
+
+.bp-line.short {
+  width: 40%;
+}
+
+.bp-line.long {
+  width: 80%;
+}
+
+.bp-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+#preview-image {
+  width: 110px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.bp-barcode {
+  width: 100%;
+  height: 40px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5) 3px, transparent 3px, transparent 6px, rgba(255, 255, 255, 0.5) 6px, rgba(255, 255, 255, 0.5) 8px, transparent 8px, transparent 12px);
+  margin-top: auto;
+  opacity: 0.5;
+}
+
+.modal-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+#message-input {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: 'Nanum Pen Script', cursive;
+  font-size: 1.6rem;
+  resize: none;
+  outline: none;
+  line-height: 1.4;
+}
+
+#message-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#upload-trigger-btn,
+#send-btn {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+
+#upload-trigger-btn:hover,
+#send-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+  color: #fff;
+}
+
+#upload-trigger-btn svg,
+#send-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+#upload-trigger-btn {
+  bottom: 0;
+  left: 0;
+}
+
+#send-btn {
+  bottom: 0;
+  right: 0;
+}
+
+/* ═══════════════════════════════════
+   DOM Stars (Message Stars)
+   ═══════════════════════════════════ */
+#stars-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.star-element {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 4px 1px #fff,
+    0 0 10px 4px #7dd3fc,
+    0 0 20px 8px rgba(56, 189, 248, 0.5),
+    0 0 35px 15px rgba(56, 189, 248, 0.15);
+}
+
+.star-element::before,
+.star-element::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.star-element::before {
+  width: 1px;
+  height: 20px;
+  box-shadow: 0 0 4px #7dd3fc;
+}
+
+.star-element::after {
+  width: 20px;
+  height: 1px;
+  box-shadow: 0 0 4px #7dd3fc;
+}
+
+.star-element:hover {
+  transform: translate(-50%, -50%) scale(1.8);
+  box-shadow:
+    0 0 10px 3px #fff,
+    0 0 25px 10px #7dd3fc,
+    0 0 50px 20px rgba(56, 189, 248, 0.7),
+    0 0 90px 35px rgba(56, 189, 248, 0.4);
+}
+
+.star-element:hover::before {
+  height: 35px;
+}
+
+.star-element:hover::after {
+  width: 35px;
+}
+
+/* Spark (traveling bullet) */
+.spark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 20px 10px #fff, 0 0 50px 20px rgba(56, 189, 248, 0.8);
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════
+   Tooltip
+   ═══════════════════════════════════ */
+#star-tooltip {
+  position: absolute;
+  /* Glassmorphism tooltip */
+  background: rgba(10, 17, 40, 0.75);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 15px;
+  width: 240px;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  transform: translate(-50%, calc(-100% - 20px));
+}
+
+#star-tooltip.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#tooltip-img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+#tooltip-text {
+  font-family: 'Nanum Pen Script', cursive;
+  font-size: 1.4rem;
+  line-height: 1.2;
+}
