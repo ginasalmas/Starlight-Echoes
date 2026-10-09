@@ -1,468 +1,642 @@
+import { CosmicBackground } from './src/three-bg.js';
+import * as api from './src/api.js';
 import gsap from 'gsap';
 
 // ═══════════════════════════════════
-// TWEAKABLE CONFIGURATION
+// CONFIGURATION
 // ═══════════════════════════════════
 const CONFIG = {
-  // Starfield (overlay on top of bg image)
-  STAR_COUNT: 200,
-  STAR_MIN_SIZE: 0.3,
-  STAR_MAX_SIZE: 1.8,
-  BRIGHT_STAR_COUNT: 8,
-  STAR_TWINKLE_SPEED: 0.002,
-
-  // Dust particles (mouse interactive)
-  DUST_COUNT: 40,
-  DUST_MAX_SIZE: 1.0,
-  MOUSE_RADIUS: 130,
-  MOUSE_REPEL_STRENGTH: 1.5,
-
-  // Shooting stars
-  SHOOTING_STAR_INTERVAL_MIN: 20000,
-  SHOOTING_STAR_INTERVAL_MAX: 50000,
-
-  // Orbits
-  ORBIT_BASE_RADIUS: 180,
-  ORBIT_RING_GAP: 65,
+  ORBIT_BASE_RADIUS: 200,
+  ORBIT_RING_GAP: 80,
   STARS_PER_RING: 6,
+  ORBIT_SPEED_BASE: 0.0012,
+  PAN_SAVE_DEBOUNCE: 1000,
+  PARALLAX_SCALE: 0.5,
 };
 
 // ═══════════════════════════════════
-// CANVAS SETUP (transparent overlay on top of bg image)
+// APP STATE
 // ═══════════════════════════════════
-const canvas = document.getElementById('cosmic-canvas');
-const ctx = canvas.getContext('2d');
-let W, H;
+let currentUser = null;
+let canvasData = null;
+let orbitItems = [];
+let orbitElements = [];     // DOM elements for orbit items
+let orbitAnimations = [];   // { el, angle, radius, speed, item }
 
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W;
-  canvas.height = H;
-}
-window.addEventListener('resize', resize);
-resize();
+// Panning state
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+let panX = 0, panY = 0;
+let targetPanX = 0, targetPanY = 0;
+let panSaveTimeout = null;
+
+// Editing state
+let editingOrbitId = null;
+let orbitPhotoFile = null;
+
+// 3D Background
+let cosmicBg = null;
 
 // ═══════════════════════════════════
-// MOUSE
+// DOM REFERENCES
 // ═══════════════════════════════════
-let mouseX = W / 2, mouseY = H / 2;
-document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+const $ = id => document.getElementById(id);
+const loadingOverlay = $('loading-overlay');
+const loginOverlay = $('login-overlay');
+const googleLoginBtn = $('google-login-btn');
+const userHeader = $('user-header');
+const diaryTitleText = $('diary-title-text');
+const diaryTitleInput = $('diary-title-input');
+const editTitleBtn = $('edit-title-btn');
+const userAvatar = $('user-avatar');
+const userDisplayName = $('user-display-name');
+const editNameBtn = $('edit-name-btn');
+const userNameInput = $('user-name-input');
+const logoutBtn = $('logout-btn');
+const canvasWorld = $('canvas-world');
+const orbitContainer = $('orbit-container');
+const starsContainer = $('stars-container');
+const centerPhoto = $('center-photo');
+const changeCenterPhotoBtn = $('change-center-photo-btn');
+const centerPhotoUpload = $('center-photo-upload');
+const centerName = $('center-name');
+const editCenterNameBtn = $('edit-center-name-btn');
+const centerNameInput = $('center-name-input');
+const addOrbitBtn = $('add-orbit-btn');
+
+// Modal
+const orbitModalOverlay = $('orbit-modal-overlay');
+const orbitModalTitle = $('orbit-modal-title');
+const orbitLabelInput = $('orbit-label-input');
+const orbitMessageInput = $('orbit-message-input');
+const orbitPhotoPreview = $('orbit-photo-preview');
+const orbitPhotoUploadBtn = $('orbit-photo-upload-btn');
+const orbitPhotoFile$ = $('orbit-photo-file');
+const orbitModalCancel = $('orbit-modal-cancel');
+const orbitModalSave = $('orbit-modal-save');
+const orbitSaveText = $('orbit-save-text');
+const orbitSaveLoading = $('orbit-save-loading');
+const skipLoginBtn = $('skip-login-btn');
+
+// Detail popup
+const detailPopup = $('orbit-detail-popup');
+const detailCloseBtn = $('detail-close-btn');
+const detailPhoto = $('detail-photo');
+const detailLabel = $('detail-label');
+const detailMessage = $('detail-message');
+const detailEditBtn = $('detail-edit-btn');
+const detailDeleteBtn = $('detail-delete-btn');
 
 // ═══════════════════════════════════
-// 1. STARFIELD (twinkling + cross spikes)
+// INIT
 // ═══════════════════════════════════
-const bgStars = [];
-for (let i = 0; i < CONFIG.STAR_COUNT; i++) {
-  bgStars.push({
-    x: Math.random() * W,
-    y: Math.random() * H,
-    size: CONFIG.STAR_MIN_SIZE + Math.random() * (CONFIG.STAR_MAX_SIZE - CONFIG.STAR_MIN_SIZE),
-    phase: Math.random() * Math.PI * 2,
-    twinkleRate: CONFIG.STAR_TWINKLE_SPEED * (0.5 + Math.random()),
-    baseAlpha: 0.2 + Math.random() * 0.6,
-    driftX: (Math.random() - 0.5) * 0.06,
-    driftY: (Math.random() - 0.5) * 0.03,
-  });
-}
+async function init() {
+  // 1. Start 3D background
+  cosmicBg = new CosmicBackground($('three-container'));
+  startRenderLoop();
 
-const brightStars = [];
-for (let i = 0; i < CONFIG.BRIGHT_STAR_COUNT; i++) {
-  brightStars.push({
-    x: 50 + Math.random() * (W - 100),
-    y: 50 + Math.random() * (H - 100),
-    size: 1.5 + Math.random() * 1.5,
-    spikeLen: 10 + Math.random() * 18,
-    phase: Math.random() * Math.PI * 2,
-    twinkleRate: 0.001 + Math.random() * 0.002,
-    driftX: (Math.random() - 0.5) * 0.03,
-    driftY: (Math.random() - 0.5) * 0.02,
-  });
-}
-
-function drawStars(time) {
-  bgStars.forEach(s => {
-    const alpha = s.baseAlpha * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(s.phase + time * s.twinkleRate)));
-    s.x += s.driftX;
-    s.y += s.driftY;
-    if (s.x < -5) s.x += W + 10;
-    if (s.x > W + 5) s.x -= W + 10;
-    if (s.y < -5) s.y += H + 10;
-    if (s.y > H + 5) s.y -= H + 10;
-
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#e0f0ff';
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-    ctx.fill();
-
-    if (s.size > 1.2) {
-      ctx.globalAlpha = alpha * 0.15;
-      ctx.fillStyle = '#7dd3fc';
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.size * 3, 0, Math.PI * 2);
-      ctx.fill();
+  // 2. Check authentication
+  try {
+    currentUser = await api.getCurrentUser();
+    showApp();
+  } catch (e) {
+    if (e.status === 401) {
+      showLogin();
+    } else {
+      // API might not be available (local dev without vercel)
+      console.warn('API not available, showing login:', e.message);
+      showLogin();
     }
-  });
+  }
 
-  brightStars.forEach(s => {
-    const alpha = 0.6 + 0.4 * Math.sin(s.phase + time * s.twinkleRate);
-    s.x += s.driftX;
-    s.y += s.driftY;
-    if (s.x < -20) s.x += W + 40;
-    if (s.x > W + 20) s.x -= W + 40;
-    if (s.y < -20) s.y += H + 40;
-    if (s.y > H + 20) s.y -= H + 40;
+  // 3. Dismiss loading
+  loadingOverlay.classList.add('fade-out');
+  setTimeout(() => loadingOverlay.remove(), 700);
 
-    const spikeLen = s.spikeLen * (0.7 + 0.3 * alpha);
-
-    // Glow
-    ctx.globalAlpha = alpha * 0.12;
-    const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, spikeLen);
-    glow.addColorStop(0, 'rgba(186, 230, 253, 0.5)');
-    glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, spikeLen, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cross spikes
-    ctx.globalAlpha = alpha * 0.6;
-    const vGrad = ctx.createLinearGradient(s.x, s.y - spikeLen, s.x, s.y + spikeLen);
-    vGrad.addColorStop(0, 'rgba(255,255,255,0)');
-    vGrad.addColorStop(0.45, 'rgba(220,240,255,0.5)');
-    vGrad.addColorStop(0.5, 'rgba(255,255,255,0.9)');
-    vGrad.addColorStop(0.55, 'rgba(220,240,255,0.5)');
-    vGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.strokeStyle = vGrad;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(s.x, s.y - spikeLen); ctx.lineTo(s.x, s.y + spikeLen); ctx.stroke();
-
-    const hGrad = ctx.createLinearGradient(s.x - spikeLen, s.y, s.x + spikeLen, s.y);
-    hGrad.addColorStop(0, 'rgba(255,255,255,0)');
-    hGrad.addColorStop(0.45, 'rgba(220,240,255,0.5)');
-    hGrad.addColorStop(0.5, 'rgba(255,255,255,0.9)');
-    hGrad.addColorStop(0.55, 'rgba(220,240,255,0.5)');
-    hGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.strokeStyle = hGrad;
-    ctx.beginPath(); ctx.moveTo(s.x - spikeLen, s.y); ctx.lineTo(s.x + spikeLen, s.y); ctx.stroke();
-
-    // Core
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  ctx.globalAlpha = 1;
+  // 4. Set up event listeners
+  setupEventListeners();
 }
 
 // ═══════════════════════════════════
-// 2. COSMIC DUST (mouse-interactive)
+// RENDER LOOP (Three.js + orbit animation)
 // ═══════════════════════════════════
-const dustParticles = [];
-for (let i = 0; i < CONFIG.DUST_COUNT; i++) {
-  dustParticles.push({
-    x: Math.random() * W,
-    y: Math.random() * H,
-    vx: (Math.random() - 0.5) * 0.2,
-    vy: (Math.random() - 0.5) * 0.2,
-    size: 0.3 + Math.random() * CONFIG.DUST_MAX_SIZE,
-    alpha: 0.06 + Math.random() * 0.14,
-  });
+function startRenderLoop() {
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Smooth canvas panning
+    panX += (targetPanX - panX) * 0.1;
+    panY += (targetPanY - panY) * 0.1;
+    canvasWorld.style.transform = `translate(${panX}px, ${panY}px)`;
+
+    // Sync 3D background (inverted + scaled for parallax)
+    cosmicBg.setTarget(-panX * CONFIG.PARALLAX_SCALE, panY * CONFIG.PARALLAX_SCALE);
+
+    // Animate orbit items
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+
+    orbitAnimations.forEach(o => {
+      o.angle += o.speed;
+      const px = cx + Math.cos(o.angle) * o.radius;
+      const py = cy + Math.sin(o.angle) * o.radius;
+      o.el.style.left = `${px}px`;
+      o.el.style.top = `${py}px`;
+    });
+
+    // Update 3D
+    cosmicBg.update();
+  }
+  animate();
 }
 
-function drawDust() {
-  dustParticles.forEach(p => {
-    const dx = p.x - mouseX, dy = p.y - mouseY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < CONFIG.MOUSE_RADIUS && dist > 0) {
-      const force = (CONFIG.MOUSE_RADIUS - dist) / CONFIG.MOUSE_RADIUS * CONFIG.MOUSE_REPEL_STRENGTH;
-      p.vx += (dx / dist) * force * 0.04;
-      p.vy += (dy / dist) * force * 0.04;
+// ═══════════════════════════════════
+// AUTH FLOW
+// ═══════════════════════════════════
+function showLogin() {
+  loginOverlay.classList.remove('hidden');
+  userHeader.classList.add('hidden');
+  canvasWorld.classList.add('hidden');
+}
+
+async function showApp() {
+  loginOverlay.classList.add('hidden');
+  userHeader.classList.remove('hidden');
+  canvasWorld.classList.remove('hidden');
+
+  // Populate user info
+  userDisplayName.textContent = currentUser.displayName;
+  if (currentUser.avatarUrl) {
+    userAvatar.src = currentUser.avatarUrl;
+  }
+
+  // Load canvas data
+  try {
+    canvasData = await api.getCanvas();
+    diaryTitleText.textContent = canvasData.title_text || 'Starlight Echoes';
+    centerName.textContent = canvasData.center_name || 'My Universe';
+    if (canvasData.center_photo_url) {
+      centerPhoto.src = canvasData.center_photo_url;
     }
-    p.vx *= 0.985; p.vy *= 0.985;
-    p.x += p.vx; p.y += p.vy;
-    if (p.x < 0) p.x += W; if (p.x > W) p.x -= W;
-    if (p.y < 0) p.y += H; if (p.y > H) p.y -= H;
+    if (canvasData.pan_x || canvasData.pan_y) {
+      targetPanX = canvasData.pan_x || 0;
+      targetPanY = canvasData.pan_y || 0;
+    }
+  } catch (e) {
+    console.warn('Could not load canvas:', e.message);
+  }
 
-    ctx.globalAlpha = p.alpha;
-    ctx.fillStyle = 'rgba(160, 210, 220, 0.7)';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  ctx.globalAlpha = 1;
-}
-
-// ═══════════════════════════════════
-// 3. SHOOTING STARS
-// ═══════════════════════════════════
-let shootingStars = [];
-
-function spawnShootingStar() {
-  const fromRight = Math.random() > 0.5;
-  shootingStars.push({
-    x: fromRight ? W + 10 : -10,
-    y: Math.random() * H * 0.6,
-    vx: (fromRight ? -1 : 1) * (10 + Math.random() * 5),
-    vy: 2 + Math.random() * 3,
-    alpha: 1,
-    length: 70 + Math.random() * 90,
-  });
-  const next = CONFIG.SHOOTING_STAR_INTERVAL_MIN + Math.random() * (CONFIG.SHOOTING_STAR_INTERVAL_MAX - CONFIG.SHOOTING_STAR_INTERVAL_MIN);
-  setTimeout(spawnShootingStar, next);
-}
-setTimeout(spawnShootingStar, 4000);
-
-function drawShootingStars() {
-  for (let i = shootingStars.length - 1; i >= 0; i--) {
-    const s = shootingStars[i];
-    s.x += s.vx; s.y += s.vy; s.alpha -= 0.007;
-    if (s.alpha <= 0 || s.x < -120 || s.x > W + 120 || s.y > H + 100) { shootingStars.splice(i, 1); continue; }
-    const angle = Math.atan2(s.vy, s.vx);
-    const tailX = s.x - Math.cos(angle) * s.length;
-    const tailY = s.y - Math.sin(angle) * s.length;
-    const grad = ctx.createLinearGradient(s.x, s.y, tailX, tailY);
-    grad.addColorStop(0, `rgba(255,255,255,${s.alpha})`);
-    grad.addColorStop(1, 'rgba(186,230,253,0)');
-    ctx.strokeStyle = grad; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(tailX, tailY); ctx.stroke();
-    ctx.globalAlpha = s.alpha; ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
+  // Load orbit items
+  try {
+    orbitItems = await api.getOrbitItems();
+    renderOrbitRings();
+    renderOrbitItems();
+  } catch (e) {
+    console.warn('Could not load orbits:', e.message);
   }
 }
 
 // ═══════════════════════════════════
-// 4. VORTEX PARTICLES (implosion)
+// EVENT LISTENERS
 // ═══════════════════════════════════
-let vortexParticles = [];
+function setupEventListeners() {
+  // --- Login ---
+  googleLoginBtn.addEventListener('click', () => {
+    window.location.href = api.getLoginUrl();
+  });
 
-function drawVortex() {
-  for (let i = vortexParticles.length - 1; i >= 0; i--) {
-    const p = vortexParticles[i];
-    p.angle += p.angularVelocity; p.radius -= p.radialVelocity; p.alpha -= 0.02;
-    if (p.radius < 5 || p.alpha <= 0) { vortexParticles.splice(i, 1); continue; }
-    const px = p.centerX + Math.cos(p.angle) * p.radius;
-    const py = p.centerY + Math.sin(p.angle) * p.radius;
-    ctx.globalAlpha = Math.max(0, p.alpha);
-    ctx.fillStyle = '#38bdf8';
-    ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI * 2); ctx.fill();
+  // --- Skip Login (Dev Mode) ---
+  if (skipLoginBtn) {
+    skipLoginBtn.addEventListener('click', () => {
+      currentUser = { displayName: 'Dev User', avatarUrl: '' };
+      canvasData = { title_text: 'Dev Mode Diary', center_name: 'Local Universe' };
+      orbitItems = [
+        { id: 1, label: 'First Memory', message: 'Hello from dev mode!', photo_url: null }
+      ];
+      showApp();
+    });
   }
-  ctx.globalAlpha = 1;
-}
 
-// ═══════════════════════════════════
-// 5. ORBIT STAR POSITIONS
-// ═══════════════════════════════════
-let orbitStars = [];
-
-function drawOrbitTrails() {
-  const cx = W / 2, cy = H / 2;
-  orbitStars.forEach(s => {
-    s.radius += (s.targetRadius - s.radius) * 0.03;
-    s.angle += s.speed;
-    const px = cx + Math.cos(s.angle) * s.radius;
-    const py = cy + Math.sin(s.angle) * s.radius;
-    s.el.style.left = `${px}px`;
-    s.el.style.top = `${py}px`;
-
-    ctx.globalAlpha = 0.10;
-    ctx.fillStyle = '#7dd3fc';
-    ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 0.03;
-    ctx.beginPath(); ctx.arc(px, py, 12, 0, Math.PI * 2); ctx.fill();
+  // --- Logout ---
+  logoutBtn.addEventListener('click', async () => {
+    try { await api.logout(); } catch (e) { /* ok */ }
+    currentUser = null;
+    showLogin();
   });
-  ctx.globalAlpha = 1;
-}
 
-// ═══════════════════════════════════
-// MAIN RENDER LOOP
-// ═══════════════════════════════════
-function render(time) {
-  ctx.clearRect(0, 0, W, H);
-  drawStars(time);
-  drawDust();
-  drawShootingStars();
-  drawVortex();
-  drawOrbitTrails();
-  requestAnimationFrame(render);
-}
-requestAnimationFrame(render);
+  // --- Canvas Panning ---
+  canvasWorld.addEventListener('pointerdown', onPanStart);
+  window.addEventListener('pointermove', onPanMove);
+  window.addEventListener('pointerup', onPanEnd);
 
-// ═══════════════════════════════════
-// APP STATE & DOM REFERENCES
-// ═══════════════════════════════════
-let messages = [];
-let currentImageSrc = null;
+  // --- Edit diary title ---
+  editTitleBtn.addEventListener('click', () => startInlineEdit(diaryTitleText, diaryTitleInput, async (val) => {
+    diaryTitleText.textContent = val;
+    await api.updateCanvas({ title_text: val });
+  }));
 
-const openModalBtn = document.getElementById('open-modal-btn');
-const modalContainer = document.getElementById('message-modal-container');
-const modal = document.getElementById('message-modal');
-const modalContent = document.getElementById('modal-content');
-const modalLeftPanel = document.getElementById('modal-left-panel');
-const uploadTriggerBtn = document.getElementById('upload-trigger-btn');
-const photoUpload = document.getElementById('photo-upload');
-const previewImage = document.getElementById('preview-image');
-const sendBtn = document.getElementById('send-btn');
-const messageInput = document.getElementById('message-input');
-const orbitContainer = document.getElementById('orbit-container');
-const starsContainer = document.getElementById('stars-container');
-const tooltip = document.getElementById('star-tooltip');
-const tooltipImg = document.getElementById('tooltip-img');
-const tooltipText = document.getElementById('tooltip-text');
+  diaryTitleText.addEventListener('dblclick', () => editTitleBtn.click());
 
-// ═══════════════════════════════════
-// MODAL OPEN / CLOSE
-// ═══════════════════════════════════
-openModalBtn.addEventListener('click', () => {
-  modalContainer.classList.remove('hidden');
-  gsap.set(modal, {
-    scale: 1, rotation: 0, skewX: 0, skewY: 0,
-    filter: 'blur(0px)', opacity: 1,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)',
-    clearProps: 'transform'
+  // --- Edit user display name ---
+  editNameBtn.addEventListener('click', () => startInlineEdit(userDisplayName, userNameInput, async (val) => {
+    userDisplayName.textContent = val;
+    await api.updateProfile({ displayName: val });
+  }));
+
+  // --- Edit center name ---
+  editCenterNameBtn.addEventListener('click', () => startInlineEdit(centerName, centerNameInput, async (val) => {
+    centerName.textContent = val;
+    await api.updateCanvas({ center_name: val });
+  }));
+
+  centerName.addEventListener('dblclick', () => editCenterNameBtn.click());
+
+  // --- Change center photo ---
+  changeCenterPhotoBtn.addEventListener('click', () => centerPhotoUpload.click());
+  centerPhotoUpload.addEventListener('change', onCenterPhotoChange);
+
+  // --- Add orbit item ---
+  addOrbitBtn.addEventListener('click', openAddOrbitModal);
+
+  // --- Orbit modal ---
+  orbitModalCancel.addEventListener('click', closeOrbitModal);
+  orbitModalOverlay.addEventListener('click', (e) => {
+    if (e.target === orbitModalOverlay) closeOrbitModal();
   });
-  modalContent.classList.remove('hidden');
-  modal.classList.remove('expanded');
-  modalLeftPanel.classList.add('hidden');
-  currentImageSrc = null;
-  previewImage.src = '';
-  messageInput.value = '';
-});
+  orbitModalSave.addEventListener('click', saveOrbitItem);
+  orbitPhotoUploadBtn.addEventListener('click', () => orbitPhotoFile$.click());
+  orbitPhotoFile$.addEventListener('change', onOrbitPhotoSelect);
 
-modalContainer.addEventListener('click', e => {
-  if (e.target === modalContainer) modalContainer.classList.add('hidden');
-});
+  // --- Detail popup ---
+  detailCloseBtn.addEventListener('click', closeDetailPopup);
+  detailEditBtn.addEventListener('click', onDetailEdit);
+  detailDeleteBtn.addEventListener('click', onDetailDelete);
+
+  // Close detail on click outside
+  document.addEventListener('click', (e) => {
+    if (!detailPopup.classList.contains('hidden') &&
+        !detailPopup.contains(e.target) &&
+        !e.target.closest('.orbit-item')) {
+      closeDetailPopup();
+    }
+  });
+}
 
 // ═══════════════════════════════════
-// PHOTO UPLOAD
+// INFINITE CANVAS PANNING
 // ═══════════════════════════════════
-uploadTriggerBtn.addEventListener('click', () => photoUpload.click());
+function onPanStart(e) {
+  // Don't pan if clicking interactive elements
+  if (e.target.closest('button, input, textarea, .orbit-item, .profile-avatar-wrapper, a, #center-name-wrapper')) return;
+  isPanning = true;
+  panStartX = e.clientX - targetPanX;
+  panStartY = e.clientY - targetPanY;
+  canvasWorld.classList.add('grabbing');
+  e.preventDefault();
+}
 
-photoUpload.addEventListener('change', e => {
+function onPanMove(e) {
+  if (!isPanning) return;
+  targetPanX = e.clientX - panStartX;
+  targetPanY = e.clientY - panStartY;
+}
+
+function onPanEnd() {
+  if (!isPanning) return;
+  isPanning = false;
+  canvasWorld.classList.remove('grabbing');
+
+  // Debounced save pan position
+  clearTimeout(panSaveTimeout);
+  panSaveTimeout = setTimeout(async () => {
+    try {
+      await api.updateCanvas({ pan_x: targetPanX, pan_y: targetPanY });
+    } catch (e) {
+      console.warn('Could not save pan position:', e.message);
+    }
+  }, CONFIG.PAN_SAVE_DEBOUNCE);
+}
+
+// ═══════════════════════════════════
+// INLINE EDITING
+// ═══════════════════════════════════
+function startInlineEdit(displayEl, inputEl, onSave) {
+  const currentValue = displayEl.textContent;
+  inputEl.value = currentValue;
+  displayEl.classList.add('hidden');
+  inputEl.classList.remove('hidden');
+  inputEl.focus();
+  inputEl.select();
+
+  const finish = async () => {
+    const newValue = inputEl.value.trim() || currentValue;
+    inputEl.classList.add('hidden');
+    displayEl.classList.remove('hidden');
+    displayEl.textContent = newValue;
+    inputEl.removeEventListener('blur', finish);
+    inputEl.removeEventListener('keydown', onKeydown);
+    try {
+      await onSave(newValue);
+    } catch (e) {
+      console.error('Save failed:', e);
+      displayEl.textContent = currentValue;
+    }
+  };
+
+  const onKeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(); }
+    if (e.key === 'Escape') { inputEl.value = currentValue; finish(); }
+  };
+
+  inputEl.addEventListener('blur', finish);
+  inputEl.addEventListener('keydown', onKeydown);
+}
+
+// ═══════════════════════════════════
+// CENTER PHOTO CHANGE
+// ═══════════════════════════════════
+async function onCenterPhotoChange(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    currentImageSrc = ev.target.result;
-    previewImage.src = currentImageSrc;
-    modal.classList.add('expanded');
-    setTimeout(() => {
-      modalLeftPanel.classList.remove('hidden');
-      modalLeftPanel.style.display = 'flex';
-      setTimeout(() => { modalLeftPanel.style.opacity = 1; }, 10);
-    }, 400);
-  };
-  reader.readAsDataURL(file);
-});
 
-// ═══════════════════════════════════
-// ORBITS
-// ═══════════════════════════════════
-function getOrbitRadius(rankIndex) {
-  return CONFIG.ORBIT_BASE_RADIUS + Math.floor(rankIndex / CONFIG.STARS_PER_RING) * CONFIG.ORBIT_RING_GAP;
+  // Show preview immediately
+  const reader = new FileReader();
+  reader.onload = (ev) => { centerPhoto.src = ev.target.result; };
+  reader.readAsDataURL(file);
+
+  // Upload
+  try {
+    const { url } = await api.uploadImage(file);
+    centerPhoto.src = url;
+    await api.updateCanvas({ center_photo_url: url });
+  } catch (err) {
+    console.error('Upload failed:', err);
+    alert('Failed to upload photo. Please try again.');
+  }
+
+  centerPhotoUpload.value = '';
 }
 
-function updateOrbitLines() {
+// ═══════════════════════════════════
+// ORBIT RINGS
+// ═══════════════════════════════════
+function renderOrbitRings() {
   orbitContainer.innerHTML = '';
-  const numLayers = Math.floor(messages.length / CONFIG.STARS_PER_RING) + 1;
-  for (let i = 0; i < numLayers; i++) {
+  const numRings = Math.max(1, Math.ceil(orbitItems.length / CONFIG.STARS_PER_RING) + 1);
+
+  for (let i = 0; i < numRings; i++) {
     const r = CONFIG.ORBIT_BASE_RADIUS + i * CONFIG.ORBIT_RING_GAP;
-    const el = document.createElement('div');
-    el.className = 'orbit-line';
-    el.style.width = `${r * 2}px`;
-    el.style.height = `${r * 2}px`;
-    orbitContainer.appendChild(el);
+    const ring = document.createElement('div');
+    ring.className = 'orbit-ring';
+    ring.style.width = `${r * 2}px`;
+    ring.style.height = `${r * 2}px`;
+    ring.style.animationDelay = `${i * 0.5}s`;
+    orbitContainer.appendChild(ring);
   }
 }
 
 // ═══════════════════════════════════
-// SEND MESSAGE (4-stage animation)
+// ORBIT ITEMS RENDERING
 // ═══════════════════════════════════
-sendBtn.addEventListener('click', () => {
-  const text = messageInput.value.trim();
-  const img = currentImageSrc || 'https://i.pravatar.cc/150?img=47';
-  if (!text) { alert('Silakan tulis pesan terlebih dahulu!'); return; }
+function renderOrbitItems() {
+  starsContainer.innerHTML = '';
+  orbitAnimations = [];
 
-  const newMsg = { text, img };
-  messages.unshift(newMsg);
+  orbitItems.forEach((item, idx) => {
+    const el = createOrbitElement(item);
+    starsContainer.appendChild(el);
 
-  orbitStars.forEach((s, idx) => { s.targetRadius = getOrbitRadius(idx + 1); });
+    const ringIndex = Math.floor(idx / CONFIG.STARS_PER_RING);
+    const radius = CONFIG.ORBIT_BASE_RADIUS + ringIndex * CONFIG.ORBIT_RING_GAP;
+    const angle = item.angle || (idx % CONFIG.STARS_PER_RING) * (Math.PI * 2 / CONFIG.STARS_PER_RING);
+    const speedMultiplier = 1 / (1 + ringIndex * 0.4);
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    const speed = CONFIG.ORBIT_SPEED_BASE * speedMultiplier * direction;
 
-  const rect = modal.getBoundingClientRect();
-  const startX = rect.left + rect.width / 2;
-  const startY = rect.top + rect.height / 2;
-  const cx = W / 2, cy = H / 2;
+    orbitAnimations.push({ el, angle, radius, speed, item });
 
-  const tl = gsap.timeline();
-
-  tl.to(modal, {
-    scale: 0.35, rotation: 50, skewX: 18, skewY: 18,
-    filter: 'blur(10px)',
-    boxShadow: '0 0 120px 60px rgba(56, 189, 248, 0.9), inset 0 0 90px rgba(56, 189, 248, 1)',
-    duration: 0.5, ease: 'power2.in',
-  })
-  .to(modal, {
-    scale: 0, opacity: 0, duration: 0.2, ease: 'power4.in',
-    onStart: () => {
-      for (let i = 0; i < 100; i++) {
-        vortexParticles.push({
-          centerX: startX, centerY: startY,
-          radius: 80 + Math.random() * 140,
-          angle: Math.random() * Math.PI * 2,
-          angularVelocity: 0.05 + Math.random() * 0.1,
-          radialVelocity: 3 + Math.random() * 5,
-          size: Math.random() * 2.5 + 0.8, alpha: 1,
-        });
-      }
-    },
-    onComplete: () => {
-      modalContainer.classList.add('hidden');
-      updateOrbitLines();
-
-      const spark = document.createElement('div');
-      spark.className = 'spark';
-      spark.style.left = `${startX}px`;
-      spark.style.top = `${startY}px`;
-      document.body.appendChild(spark);
-
-      const radius = getOrbitRadius(0);
-      const angle = Math.random() * Math.PI * 2;
-      const targetX = cx + Math.cos(angle) * radius;
-      const targetY = cy + Math.sin(angle) * radius;
-
-      gsap.to(spark, { x: targetX - startX, ease: 'power1.inOut', duration: 0.7 });
-      gsap.to(spark, {
-        y: targetY - startY, ease: 'power3.in', duration: 0.7,
-        onComplete: () => {
-          spark.remove();
-          const star = document.createElement('div');
-          star.className = 'star-element';
-          star.style.left = `${targetX}px`;
-          star.style.top = `${targetY}px`;
-
-          gsap.fromTo(star, { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' });
-
-          star.addEventListener('mouseenter', () => {
-            const r = star.getBoundingClientRect();
-            tooltipImg.src = newMsg.img;
-            tooltipText.textContent = newMsg.text;
-            tooltip.style.left = `${r.left + r.width / 2}px`;
-            tooltip.style.top = `${r.top}px`;
-            tooltip.classList.remove('hidden');
-          });
-          star.addEventListener('mouseleave', () => tooltip.classList.add('hidden'));
-
-          starsContainer.appendChild(star);
-
-          const baseSpeed = 0.0015;
-          const speed = (baseSpeed / (1 + Math.floor(0 / CONFIG.STARS_PER_RING) * 0.5)) * (Math.random() > 0.5 ? 1 : -1);
-          orbitStars.unshift({ el: star, angle, radius, targetRadius: radius, speed });
-        },
-      });
-    },
+    // Entry animation
+    gsap.fromTo(el, 
+      { scale: 0, opacity: 0 },
+      { scale: 1, opacity: 1, duration: 0.8, delay: idx * 0.08, ease: 'elastic.out(1, 0.6)' }
+    );
   });
-});
+}
+
+function createOrbitElement(item) {
+  const el = document.createElement('div');
+  el.className = 'orbit-item';
+  el.dataset.id = item.id;
+
+  if (item.photo_url) {
+    el.innerHTML = `
+      <div class="orbit-item-photo-wrapper">
+        <img class="orbit-item-photo" src="${item.photo_url}" alt="${item.label}" />
+      </div>
+      <span class="orbit-item-label">${item.label}</span>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="orbit-item-photo-wrapper">
+        <div class="orbit-item-star"></div>
+      </div>
+      <span class="orbit-item-label">${item.label}</span>
+    `;
+  }
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showDetailPopup(item, el);
+  });
+
+  return el;
+}
+
+// ═══════════════════════════════════
+// ORBIT DETAIL POPUP
+// ═══════════════════════════════════
+let selectedOrbitItem = null;
+
+function showDetailPopup(item, el) {
+  selectedOrbitItem = item;
+
+  if (item.photo_url) {
+    detailPhoto.src = item.photo_url;
+    detailPhoto.classList.remove('hidden');
+  } else {
+    detailPhoto.classList.add('hidden');
+  }
+
+  detailLabel.textContent = item.label;
+  detailMessage.textContent = item.message || 'No message yet.';
+
+  // Position popup near the element
+  const rect = el.getBoundingClientRect();
+  const popupWidth = 260;
+  let left = rect.left + rect.width / 2 - popupWidth / 2;
+  let top = rect.top - 20;
+
+  // Keep in viewport
+  left = Math.max(10, Math.min(left, window.innerWidth - popupWidth - 10));
+  if (top < 200) {
+    top = rect.bottom + 20;
+  } else {
+    top = rect.top - detailPopup.offsetHeight - 20;
+  }
+
+  detailPopup.style.left = `${left}px`;
+  detailPopup.style.top = `${Math.max(10, top)}px`;
+  detailPopup.classList.remove('hidden');
+}
+
+function closeDetailPopup() {
+  detailPopup.classList.add('hidden');
+  selectedOrbitItem = null;
+}
+
+function onDetailEdit() {
+  if (!selectedOrbitItem) return;
+  closeDetailPopup();
+  openEditOrbitModal(selectedOrbitItem);
+}
+
+async function onDetailDelete() {
+  if (!selectedOrbitItem) return;
+  if (!confirm(`Delete "${selectedOrbitItem.label}"?`)) return;
+
+  const id = selectedOrbitItem.id;
+  closeDetailPopup();
+
+  try {
+    await api.deleteOrbitItem(id);
+    orbitItems = orbitItems.filter(i => i.id !== id);
+    renderOrbitRings();
+    renderOrbitItems();
+  } catch (e) {
+    console.error('Delete failed:', e);
+    alert('Failed to delete. Please try again.');
+  }
+}
+
+// ═══════════════════════════════════
+// ORBIT MODAL (Add / Edit)
+// ═══════════════════════════════════
+function openAddOrbitModal() {
+  editingOrbitId = null;
+  orbitPhotoFile = null;
+  orbitModalTitle.textContent = 'Add New Memory';
+  orbitSaveText.textContent = 'Add Star';
+  orbitLabelInput.value = '';
+  orbitMessageInput.value = '';
+  orbitPhotoPreview.src = '';
+  orbitPhotoPreview.classList.add('hidden');
+  orbitPhotoUploadBtn.classList.remove('hidden');
+  orbitModalOverlay.classList.remove('hidden');
+  orbitLabelInput.focus();
+}
+
+function openEditOrbitModal(item) {
+  editingOrbitId = item.id;
+  orbitPhotoFile = null;
+  orbitModalTitle.textContent = 'Edit Memory';
+  orbitSaveText.textContent = 'Save Changes';
+  orbitLabelInput.value = item.label;
+  orbitMessageInput.value = item.message || '';
+
+  if (item.photo_url) {
+    orbitPhotoPreview.src = item.photo_url;
+    orbitPhotoPreview.classList.remove('hidden');
+    orbitPhotoUploadBtn.classList.add('hidden');
+  } else {
+    orbitPhotoPreview.src = '';
+    orbitPhotoPreview.classList.add('hidden');
+    orbitPhotoUploadBtn.classList.remove('hidden');
+  }
+
+  orbitModalOverlay.classList.remove('hidden');
+  orbitLabelInput.focus();
+}
+
+function closeOrbitModal() {
+  orbitModalOverlay.classList.add('hidden');
+  editingOrbitId = null;
+  orbitPhotoFile = null;
+  orbitPhotoFile$.value = '';
+}
+
+function onOrbitPhotoSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  orbitPhotoFile = file;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    orbitPhotoPreview.src = ev.target.result;
+    orbitPhotoPreview.classList.remove('hidden');
+    orbitPhotoUploadBtn.classList.add('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveOrbitItem() {
+  const label = orbitLabelInput.value.trim();
+  if (!label) {
+    orbitLabelInput.focus();
+    orbitLabelInput.style.borderColor = '#f87171';
+    setTimeout(() => { orbitLabelInput.style.borderColor = ''; }, 2000);
+    return;
+  }
+
+  const message = orbitMessageInput.value.trim();
+
+  // Show loading
+  orbitSaveText.classList.add('hidden');
+  orbitSaveLoading.classList.remove('hidden');
+  orbitModalSave.disabled = true;
+
+  try {
+    let photoUrl = null;
+
+    // Upload photo if selected
+    if (orbitPhotoFile) {
+      const uploadResult = await api.uploadImage(orbitPhotoFile);
+      photoUrl = uploadResult.url;
+    }
+
+    if (editingOrbitId) {
+      // Update existing
+      const updateData = { label, message };
+      if (photoUrl) updateData.photo_url = photoUrl;
+      const updated = await api.updateOrbitItem(editingOrbitId, updateData);
+
+      // Update local state
+      const idx = orbitItems.findIndex(i => i.id === editingOrbitId);
+      if (idx >= 0) orbitItems[idx] = updated;
+    } else {
+      // Create new
+      const newItem = await api.createOrbitItem({
+        label,
+        message,
+        photo_url: photoUrl,
+      });
+      orbitItems.push(newItem);
+    }
+
+    // Re-render
+    renderOrbitRings();
+    renderOrbitItems();
+    closeOrbitModal();
+  } catch (e) {
+    console.error('Save orbit failed:', e);
+    alert('Failed to save. Please try again.');
+  } finally {
+    orbitSaveText.classList.remove('hidden');
+    orbitSaveLoading.classList.add('hidden');
+    orbitModalSave.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════
+// BOOT
+// ═══════════════════════════════════
+init();

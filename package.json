@@ -1,6 +1,6 @@
 {
-  "name": "go-eun-record",
-  "version": "0.0.0",
+  "name": "starlight-echoes",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,10 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
-    "gsap": "^3.15.0"
+    "gsap": "^3.15.0",
+    "three": "^0.170.0",
+    "@vercel/postgres": "^0.10.0",
+    "@vercel/blob": "^0.27.0",
+    "jose": "^6.0.0"
   }
 }

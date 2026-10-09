@@ -4,80 +4,169 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GO-EUN'S RECORD</title>
+  <title>Starlight Echoes — Your Cosmic Diary</title>
+  <meta name="description" content="A beautiful infinite canvas diary in the cosmos. Write memories, collect stars, and explore your universe." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Nanum+Pen+Script&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
 
 <body>
-  <canvas id="cosmic-canvas"></canvas>
-  <div id="nebula-overlay"></div>
+  <!-- Three.js mounts here -->
+  <div id="three-container"></div>
 
-  <div id="title-text">고은의 기록</div>
-
-  <div id="central-profile">
-    <div class="profile-avatar-wrapper" id="avatar-wrapper">
-      <img
-        src="https://gbaike-image.cdn.bcebos.com/aa64034f78f0f736e636e6550555b319eac4139d/aa64034f78f0f736e636e6550555b319eac4139d_3_4?x-bce-process=image/format,f_auto"
-        alt="Go-Eun" />
+  <!-- ═══════════════════════════════════
+       LOGIN OVERLAY
+       ═══════════════════════════════════ -->
+  <div id="login-overlay">
+    <div class="login-card">
+      <div class="login-stars">✦ ✧ ✦</div>
+      <h1 class="login-title">Starlight Echoes</h1>
+      <p class="login-subtitle">Your cosmic personal diary</p>
+      <button id="google-login-btn" type="button">
+        <svg viewBox="0 0 24 24" width="20" height="20">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <button id="skip-login-btn" type="button" style="margin-top: 10px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+        Skip Login (Local Dev Mode)
+      </button>
+      <p class="login-footer">Sign in to start your cosmic journey</p>
     </div>
-    <div class="profile-name">우리의 안고은</div>
-    <button id="open-modal-btn">글쓰기</button>
   </div>
 
-  <!-- Stars container -->
-  <div id="stars-container"></div>
-  <div id="orbit-container"></div>
-
-  <!-- Tooltip -->
-  <div id="star-tooltip" class="hidden">
-    <img id="tooltip-img" src="" alt="Memory" />
-    <div id="tooltip-text"></div>
+  <!-- ═══════════════════════════════════
+       USER HEADER (top-right)
+       ═══════════════════════════════════ -->
+  <div id="user-header" class="hidden">
+    <div id="diary-title-wrapper">
+      <span id="diary-title-text">Starlight Echoes</span>
+      <input id="diary-title-input" type="text" class="hidden" maxlength="50" />
+      <button id="edit-title-btn" class="icon-btn" title="Edit diary title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="user-info">
+      <img id="user-avatar" src="" alt="avatar" />
+      <span id="user-display-name">User</span>
+      <button id="edit-name-btn" class="icon-btn" title="Edit display name">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+      <input id="user-name-input" type="text" class="hidden" maxlength="50" />
+    </div>
+    <button id="logout-btn" type="button">Logout</button>
   </div>
 
-  <!-- Modal -->
-  <div id="message-modal-container" class="hidden">
-    <div id="message-modal">
-      <div class="modal-content-wrapper" id="modal-content">
-        <div class="modal-left hidden" id="modal-left-panel">
-          <div class="boarding-pass">
-            <div class="bp-header">
-              <div class="bp-line short"></div>
-              <div class="bp-line long"></div>
-            </div>
-            <div class="bp-body">
-              <img id="preview-image" src="" alt="Preview" />
-              <div class="bp-barcode"></div>
-            </div>
+  <!-- ═══════════════════════════════════
+       INFINITE CANVAS WORLD
+       ═══════════════════════════════════ -->
+  <div id="canvas-world" class="hidden">
+    <!-- Orbit rings rendered by JS -->
+    <div id="orbit-container"></div>
+
+    <!-- Central Profile -->
+    <div id="central-profile">
+      <div class="profile-avatar-wrapper" id="avatar-wrapper">
+        <img id="center-photo" src="" alt="Center" />
+        <button id="change-center-photo-btn" class="photo-edit-btn" title="Change photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </button>
+        <input id="center-photo-upload" type="file" accept="image/*" hidden />
+      </div>
+      <div id="center-name-wrapper">
+        <span id="center-name">My Universe</span>
+        <button id="edit-center-name-btn" class="icon-btn small" title="Edit name">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <input id="center-name-input" type="text" class="hidden" maxlength="50" />
+      </div>
+      <button id="add-orbit-btn" type="button">+ Add Memory</button>
+    </div>
+
+    <!-- Orbit items container (rendered by JS) -->
+    <div id="stars-container"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       ADD/EDIT ORBIT MODAL
+       ═══════════════════════════════════ -->
+  <div id="orbit-modal-overlay" class="modal-overlay hidden">
+    <div id="orbit-modal" class="modal-card">
+      <h2 id="orbit-modal-title">Add New Memory</h2>
+      <div class="modal-form">
+        <div class="form-group">
+          <label for="orbit-label-input">Name</label>
+          <input id="orbit-label-input" type="text" placeholder="Name this star..." maxlength="50" />
+        </div>
+        <div class="form-group">
+          <label for="orbit-message-input">Memory</label>
+          <textarea id="orbit-message-input" placeholder="Write your memory here..." rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Photo (optional)</label>
+          <div id="orbit-photo-preview-wrapper">
+            <img id="orbit-photo-preview" src="" alt="Preview" class="hidden" />
+            <button id="orbit-photo-upload-btn" type="button" class="upload-area">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Click to upload</span>
+            </button>
+            <input id="orbit-photo-file" type="file" accept="image/*" hidden />
           </div>
         </div>
-        <div class="modal-right">
-          <textarea id="message-input" placeholder="Tulis pesan kenanganmu di sini..."></textarea>
-
-          <button id="upload-trigger-btn" title="Upload Foto">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-          </button>
-          <input type="file" id="photo-upload" accept="image/*" hidden />
-
-          <button id="send-btn" title="Kirim">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
+        <div class="modal-actions">
+          <button id="orbit-modal-cancel" type="button" class="btn-secondary">Cancel</button>
+          <button id="orbit-modal-save" type="button" class="btn-primary">
+            <span id="orbit-save-text">Add Star</span>
+            <span id="orbit-save-loading" class="hidden">Saving...</span>
           </button>
         </div>
       </div>
-      <div class="star-core hidden" id="modal-star-core"></div>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       ORBIT DETAIL / EDIT TOOLTIP
+       ═══════════════════════════════════ -->
+  <div id="orbit-detail-popup" class="hidden">
+    <button id="detail-close-btn" class="icon-btn" title="Close">✕</button>
+    <img id="detail-photo" src="" alt="Memory" />
+    <div id="detail-label"></div>
+    <div id="detail-message"></div>
+    <div class="detail-actions">
+      <button id="detail-edit-btn" class="btn-small" title="Edit">✏️ Edit</button>
+      <button id="detail-delete-btn" class="btn-small danger" title="Delete">🗑️ Delete</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       LOADING OVERLAY
+       ═══════════════════════════════════ -->
+  <div id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Connecting to the cosmos...</p>
   </div>
 
   <script type="module" src="/main.js"></script>
