@@ -40,11 +40,26 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: 'File too large. Maximum 4.5MB.' });
     }
 
-    // Check if token exists
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    // Check if token exists (check standard name and any prefixed name)
+    let token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      for (const [key, val] of Object.entries(process.env)) {
+        if ((key.endsWith('READ_WRITE_TOKEN') || key.endsWith('BLOB_TOKEN')) && val) {
+          token = val;
+          break;
+        }
+      }
+    }
+
+    if (token) {
+      token = token.trim().replace(/^["']|["']$/g, '');
+    }
+
     if (!token) {
       console.error('BLOB_READ_WRITE_TOKEN is not set!');
-      return res.status(500).json({ error: 'Blob storage not configured. BLOB_READ_WRITE_TOKEN is missing.' });
+      return res.status(500).json({
+        error: 'Blob storage not configured. BLOB_READ_WRITE_TOKEN is missing. If you just added it in Vercel, please redeploy.',
+      });
     }
 
     // Upload to Vercel Blob

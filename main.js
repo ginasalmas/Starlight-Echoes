@@ -371,7 +371,7 @@ async function onCenterPhotoChange(e) {
     await api.updateCanvas({ center_photo_url: url });
   } catch (err) {
     console.error('Upload failed:', err);
-    alert('Failed to upload photo. Please try again.');
+    alert(`Failed to upload photo: ${err.message || 'Please try again.'}`);
   }
 
   centerPhotoUpload.value = '';
@@ -628,7 +628,7 @@ async function saveOrbitItem() {
     closeOrbitModal();
   } catch (e) {
     console.error('Save orbit failed:', e);
-    alert('Failed to save. Please try again.');
+    alert(`Failed to save: ${e.message || 'Please try again.'}`);
   } finally {
     orbitSaveText.classList.remove('hidden');
     orbitSaveLoading.classList.add('hidden');
