@@ -40,16 +40,24 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: 'File too large. Maximum 4.5MB.' });
     }
 
+    // Check if token exists
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      console.error('BLOB_READ_WRITE_TOKEN is not set!');
+      return res.status(500).json({ error: 'Blob storage not configured. BLOB_READ_WRITE_TOKEN is missing.' });
+    }
+
     // Upload to Vercel Blob
     const blob = await put(`starlight-echoes/${user.id}/${filename}`, buffer, {
       access: 'public',
       contentType,
       addRandomSuffix: true,
+      token, // explicitly pass the token
     });
 
     return res.status(200).json({ url: blob.url });
   } catch (error) {
     console.error('Upload error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: `Upload failed: ${error.message}` });
   }
 }
