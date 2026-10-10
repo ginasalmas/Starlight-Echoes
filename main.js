@@ -80,6 +80,15 @@ const tooltip = $('star-tooltip');
 const tooltipImg = $('tooltip-img');
 const tooltipText = $('tooltip-text');
 
+// Detail Popup
+const detailPopup = $('detail-popup');
+const detailTimestamp = $('detail-timestamp');
+const detailImg = $('detail-img');
+const detailText = $('detail-text');
+const detailEditBtn = $('detail-edit-btn');
+const detailDeleteBtn = $('detail-delete-btn');
+const detailCloseBtn = $('detail-close-btn');
+
 let currentImageSrc = null;
 let currentImageFile = null;
 
@@ -240,11 +249,21 @@ function setupEventListeners() {
   // --- Open Boarding Pass Modal ---
   if (openModalBtn) openModalBtn.addEventListener('click', openBoardingPassModal);
 
-  // --- Close modal on click outside ---
+  // --- Close modals on click outside ---
   if (modalContainer) {
     modalContainer.addEventListener('click', (e) => {
       if (e.target === modalContainer) modalContainer.classList.add('hidden');
     });
+  }
+
+  if (detailPopup) {
+    detailPopup.addEventListener('click', (e) => {
+      if (e.target === detailPopup) detailPopup.classList.add('hidden');
+    });
+  }
+
+  if (detailCloseBtn) {
+    detailCloseBtn.addEventListener('click', () => detailPopup.classList.add('hidden'));
   }
 
   // --- Photo upload trigger ---
@@ -467,12 +486,48 @@ function createStarElement(item, rankIndex) {
     tooltip.classList.add('hidden');
   });
 
-  // Click to delete
-  star.addEventListener('click', async (e) => {
+  // Click to open detail popup
+  star.addEventListener('click', (e) => {
     e.stopPropagation();
-    const label = item.label || item.message || 'bintang ini';
-    if (!confirm(`Hapus ${label}?`)) return;
-    await deleteStar(item.id, star);
+    
+    // Set Timestamp
+    if (item.created_at) {
+      const date = new Date(item.created_at);
+      detailTimestamp.textContent = date.toLocaleString('id-ID', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } else {
+      detailTimestamp.textContent = '';
+    }
+
+    // Set Image
+    if (item.photo_url) {
+      detailImg.src = item.photo_url;
+      detailImg.classList.remove('hidden');
+    } else {
+      detailImg.src = '';
+      detailImg.classList.add('hidden');
+    }
+
+    // Set Text
+    detailText.textContent = item.message || item.label || 'Kenangan tanpa pesan.';
+
+    // Show popup
+    detailPopup.classList.remove('hidden');
+
+    // Handle Edit (Not implemented fully, just alert for now or implement if needed)
+    detailEditBtn.onclick = () => {
+      alert('Fitur edit akan segera hadir!');
+    };
+
+    // Handle Delete
+    detailDeleteBtn.onclick = async () => {
+      if (confirm(`Hapus kenangan ini?`)) {
+        detailPopup.classList.add('hidden');
+        await deleteStar(item.id, star);
+      }
+    };
   });
 
   return star;
@@ -622,6 +677,7 @@ async function onSendMessage() {
             label: text.slice(0, 30),
             message: text,
             photo_url: localImg,
+            created_at: new Date().toISOString()
           };
 
           const star = createStarElement(newMsg, 0);
