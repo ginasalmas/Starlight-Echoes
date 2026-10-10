@@ -143,7 +143,9 @@ function startRenderLoop() {
 
     orbitAnimations.forEach(o => {
       o.radius += (o.targetRadius - o.radius) * 0.03;
-      o.angle += o.speed;
+      if (!o.isPaused) {
+        o.angle += o.speed;
+      }
       const px = cx + Math.cos(o.angle) * o.radius;
       const py = cy + Math.sin(o.angle) * o.radius;
       o.el.style.left = `${px}px`;
@@ -279,7 +281,7 @@ function setupEventListeners() {
 // ═══════════════════════════════════
 function onPanStart(e) {
   // Don't pan if clicking interactive elements
-  if (e.target.closest('button, input, textarea, .orbit-item, .profile-avatar-wrapper, a, #center-name-wrapper')) return;
+  if (e.target.closest('button, input, textarea, .orbit-item, .star-element, .profile-avatar-wrapper, a, #center-name-wrapper')) return;
   isPanning = true;
   panStartX = e.clientX - targetPanX;
   panStartY = e.clientY - targetPanY;
@@ -468,6 +470,9 @@ function createStarElement(item, rankIndex) {
 
   // Tooltip on hover
   star.addEventListener('mouseenter', () => {
+    const anim = orbitAnimations.find(a => a.el === star);
+    if (anim) anim.isPaused = true;
+
     const r = star.getBoundingClientRect();
     if (item.photo_url) {
       tooltipImg.src = item.photo_url;
@@ -483,6 +488,8 @@ function createStarElement(item, rankIndex) {
   });
 
   star.addEventListener('mouseleave', () => {
+    const anim = orbitAnimations.find(a => a.el === star);
+    if (anim) anim.isPaused = false;
     tooltip.classList.add('hidden');
   });
 
