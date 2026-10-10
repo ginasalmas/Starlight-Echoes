@@ -8,7 +8,7 @@
   <meta name="description" content="A beautiful infinite canvas diary in the cosmos. Write memories, collect stars, and explore your universe." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=Nanum+Pen+Script&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
@@ -102,66 +102,61 @@
         </button>
         <input id="center-name-input" type="text" class="hidden" maxlength="50" />
       </div>
-      <button id="add-orbit-btn" type="button">+ Add Memory</button>
+      <button id="open-modal-btn" type="button">글쓰기</button>
     </div>
 
-    <!-- Orbit items container (rendered by JS) -->
+    <!-- Stars container -->
     <div id="stars-container"></div>
   </div>
 
   <!-- ═══════════════════════════════════
-       ADD/EDIT ORBIT MODAL
+       BOARDING PASS MESSAGE MODAL (First Commit Design)
        ═══════════════════════════════════ -->
-  <div id="orbit-modal-overlay" class="modal-overlay hidden">
-    <div id="orbit-modal" class="modal-card">
-      <h2 id="orbit-modal-title">Add New Memory</h2>
-      <div class="modal-form">
-        <div class="form-group">
-          <label for="orbit-label-input">Name</label>
-          <input id="orbit-label-input" type="text" placeholder="Name this star..." maxlength="50" />
-        </div>
-        <div class="form-group">
-          <label for="orbit-message-input">Memory</label>
-          <textarea id="orbit-message-input" placeholder="Write your memory here..." rows="4"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Photo (optional)</label>
-          <div id="orbit-photo-preview-wrapper">
-            <img id="orbit-photo-preview" src="" alt="Preview" class="hidden" />
-            <button id="orbit-photo-upload-btn" type="button" class="upload-area">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <span>Click to upload</span>
-            </button>
-            <input id="orbit-photo-file" type="file" accept="image/*" hidden />
+  <div id="message-modal-container" class="hidden">
+    <div id="message-modal">
+      <div class="modal-content-wrapper" id="modal-content">
+        <div class="modal-left hidden" id="modal-left-panel">
+          <div class="boarding-pass">
+            <div class="bp-header">
+              <div class="bp-line short"></div>
+              <div class="bp-line long"></div>
+            </div>
+            <div class="bp-body">
+              <img id="preview-image" src="" alt="Preview" />
+              <div class="bp-barcode"></div>
+            </div>
           </div>
         </div>
-        <div class="modal-actions">
-          <button id="orbit-modal-cancel" type="button" class="btn-secondary">Cancel</button>
-          <button id="orbit-modal-save" type="button" class="btn-primary">
-            <span id="orbit-save-text">Add Star</span>
-            <span id="orbit-save-loading" class="hidden">Saving...</span>
+        <div class="modal-right">
+          <textarea id="message-input" placeholder="Tulis pesan kenanganmu di sini..."></textarea>
+
+          <button id="upload-trigger-btn" type="button" title="Upload Foto">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          <input type="file" id="photo-upload" accept="image/*" hidden />
+
+          <button id="send-btn" type="button" title="Kirim">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
           </button>
         </div>
       </div>
+      <div class="star-core hidden" id="modal-star-core"></div>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════
-       ORBIT DETAIL / EDIT TOOLTIP
-       ═══════════════════════════════════ -->
-  <div id="orbit-detail-popup" class="hidden">
-    <button id="detail-close-btn" class="icon-btn" title="Close">✕</button>
-    <img id="detail-photo" src="" alt="Memory" />
-    <div id="detail-label"></div>
-    <div id="detail-message"></div>
-    <div class="detail-actions">
-      <button id="detail-edit-btn" class="btn-small" title="Edit">✏️ Edit</button>
-      <button id="detail-delete-btn" class="btn-small danger" title="Delete">🗑️ Delete</button>
-    </div>
+  <!-- Tooltip -->
+  <div id="star-tooltip" class="hidden">
+    <img id="tooltip-img" src="" alt="Memory" />
+    <div id="tooltip-text"></div>
   </div>
 
   <!-- ═══════════════════════════════════

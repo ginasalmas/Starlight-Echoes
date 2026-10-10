@@ -6,10 +6,10 @@ import gsap from 'gsap';
 // CONFIGURATION
 // ═══════════════════════════════════
 const CONFIG = {
-  ORBIT_BASE_RADIUS: 200,
-  ORBIT_RING_GAP: 80,
+  ORBIT_BASE_RADIUS: 180,
+  ORBIT_RING_GAP: 65,
   STARS_PER_RING: 6,
-  ORBIT_SPEED_BASE: 0.0012,
+  ORBIT_SPEED_BASE: 0.0015,
   PAN_SAVE_DEBOUNCE: 1000,
   PARALLAX_SCALE: 0.5,
 };
@@ -62,30 +62,27 @@ const centerPhotoUpload = $('center-photo-upload');
 const centerName = $('center-name');
 const editCenterNameBtn = $('edit-center-name-btn');
 const centerNameInput = $('center-name-input');
-const addOrbitBtn = $('add-orbit-btn');
+const openModalBtn = $('open-modal-btn');
 
-// Modal
-const orbitModalOverlay = $('orbit-modal-overlay');
-const orbitModalTitle = $('orbit-modal-title');
-const orbitLabelInput = $('orbit-label-input');
-const orbitMessageInput = $('orbit-message-input');
-const orbitPhotoPreview = $('orbit-photo-preview');
-const orbitPhotoUploadBtn = $('orbit-photo-upload-btn');
-const orbitPhotoFile$ = $('orbit-photo-file');
-const orbitModalCancel = $('orbit-modal-cancel');
-const orbitModalSave = $('orbit-modal-save');
-const orbitSaveText = $('orbit-save-text');
-const orbitSaveLoading = $('orbit-save-loading');
+// Boarding Pass Modal
+const modalContainer = $('message-modal-container');
+const modal = $('message-modal');
+const modalContent = $('modal-content');
+const modalLeftPanel = $('modal-left-panel');
+const uploadTriggerBtn = $('upload-trigger-btn');
+const photoUpload = $('photo-upload');
+const previewImage = $('preview-image');
+const sendBtn = $('send-btn');
+const messageInput = $('message-input');
 const skipLoginBtn = $('skip-login-btn');
 
-// Detail popup
-const detailPopup = $('orbit-detail-popup');
-const detailCloseBtn = $('detail-close-btn');
-const detailPhoto = $('detail-photo');
-const detailLabel = $('detail-label');
-const detailMessage = $('detail-message');
-const detailEditBtn = $('detail-edit-btn');
-const detailDeleteBtn = $('detail-delete-btn');
+// Tooltip
+const tooltip = $('star-tooltip');
+const tooltipImg = $('tooltip-img');
+const tooltipText = $('tooltip-text');
+
+let currentImageSrc = null;
+let currentImageFile = null;
 
 // ═══════════════════════════════════
 // INIT
@@ -137,6 +134,7 @@ function startRenderLoop() {
     const cy = window.innerHeight / 2;
 
     orbitAnimations.forEach(o => {
+      o.radius += (o.targetRadius - o.radius) * 0.03;
       o.angle += o.speed;
       const px = cx + Math.cos(o.angle) * o.radius;
       const py = cy + Math.sin(o.angle) * o.radius;
@@ -189,7 +187,7 @@ async function showApp() {
   // Load orbit items
   try {
     orbitItems = await api.getOrbitItems();
-    renderOrbitRings();
+    updateOrbitLines();
     renderOrbitItems();
   } catch (e) {
     console.warn('Could not load orbits:', e.message);
@@ -255,31 +253,22 @@ function setupEventListeners() {
   changeCenterPhotoBtn.addEventListener('click', () => centerPhotoUpload.click());
   centerPhotoUpload.addEventListener('change', onCenterPhotoChange);
 
-  // --- Add orbit item ---
-  addOrbitBtn.addEventListener('click', openAddOrbitModal);
+  // --- Open Boarding Pass Modal ---
+  if (openModalBtn) openModalBtn.addEventListener('click', openBoardingPassModal);
 
-  // --- Orbit modal ---
-  orbitModalCancel.addEventListener('click', closeOrbitModal);
-  orbitModalOverlay.addEventListener('click', (e) => {
-    if (e.target === orbitModalOverlay) closeOrbitModal();
-  });
-  orbitModalSave.addEventListener('click', saveOrbitItem);
-  orbitPhotoUploadBtn.addEventListener('click', () => orbitPhotoFile$.click());
-  orbitPhotoFile$.addEventListener('change', onOrbitPhotoSelect);
+  // --- Close modal on click outside ---
+  if (modalContainer) {
+    modalContainer.addEventListener('click', (e) => {
+      if (e.target === modalContainer) modalContainer.classList.add('hidden');
+    });
+  }
 
-  // --- Detail popup ---
-  detailCloseBtn.addEventListener('click', closeDetailPopup);
-  detailEditBtn.addEventListener('click', onDetailEdit);
-  detailDeleteBtn.addEventListener('click', onDetailDelete);
+  // --- Photo upload trigger ---
+  if (uploadTriggerBtn) uploadTriggerBtn.addEventListener('click', () => photoUpload.click());
+  if (photoUpload) photoUpload.addEventListener('change', onPhotoSelected);
 
-  // Close detail on click outside
-  document.addEventListener('click', (e) => {
-    if (!detailPopup.classList.contains('hidden') &&
-        !detailPopup.contains(e.target) &&
-        !e.target.closest('.orbit-item')) {
-      closeDetailPopup();
-    }
-  });
+  // --- Send message ---
+  if (sendBtn) sendBtn.addEventListener('click', onSendMessage);
 }
 
 // ═══════════════════════════════════
@@ -378,261 +367,303 @@ async function onCenterPhotoChange(e) {
 }
 
 // ═══════════════════════════════════
-// ORBIT RINGS
+// ORBITS & STARS (First Commit Physics)
 // ═══════════════════════════════════
-function renderOrbitRings() {
-  orbitContainer.innerHTML = '';
-  const numRings = Math.max(1, Math.ceil(orbitItems.length / CONFIG.STARS_PER_RING) + 1);
+function getOrbitRadius(rankIndex) {
+  return CONFIG.ORBIT_BASE_RADIUS + Math.floor(rankIndex / CONFIG.STARS_PER_RING) * CONFIG.ORBIT_RING_GAP;
+}
 
-  for (let i = 0; i < numRings; i++) {
+function updateOrbitLines() {
+  orbitContainer.innerHTML = '';
+  const numLayers = Math.max(1, Math.floor(orbitItems.length / CONFIG.STARS_PER_RING) + 1);
+  for (let i = 0; i < numLayers; i++) {
     const r = CONFIG.ORBIT_BASE_RADIUS + i * CONFIG.ORBIT_RING_GAP;
-    const ring = document.createElement('div');
-    ring.className = 'orbit-ring';
-    ring.style.width = `${r * 2}px`;
-    ring.style.height = `${r * 2}px`;
-    ring.style.animationDelay = `${i * 0.5}s`;
-    orbitContainer.appendChild(ring);
+    const el = document.createElement('div');
+    el.className = 'orbit-line';
+    el.style.width = `${r * 2}px`;
+    el.style.height = `${r * 2}px`;
+    orbitContainer.appendChild(el);
   }
 }
 
-// ═══════════════════════════════════
-// ORBIT ITEMS RENDERING
-// ═══════════════════════════════════
 function renderOrbitItems() {
   starsContainer.innerHTML = '';
   orbitAnimations = [];
 
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+
   orbitItems.forEach((item, idx) => {
-    const el = createOrbitElement(item);
-    starsContainer.appendChild(el);
+    const radius = getOrbitRadius(idx);
+    const angle = item.angle !== undefined ? item.angle : (idx % CONFIG.STARS_PER_RING) * (Math.PI * 2 / CONFIG.STARS_PER_RING) + Math.random() * 0.2;
+    const px = cx + Math.cos(angle) * radius;
+    const py = cy + Math.sin(angle) * radius;
 
-    const ringIndex = Math.floor(idx / CONFIG.STARS_PER_RING);
-    const radius = CONFIG.ORBIT_BASE_RADIUS + ringIndex * CONFIG.ORBIT_RING_GAP;
-    const angle = item.angle || (idx % CONFIG.STARS_PER_RING) * (Math.PI * 2 / CONFIG.STARS_PER_RING);
-    const speedMultiplier = 1 / (1 + ringIndex * 0.4);
-    const direction = Math.random() > 0.5 ? 1 : -1;
-    const speed = CONFIG.ORBIT_SPEED_BASE * speedMultiplier * direction;
-
-    orbitAnimations.push({ el, angle, radius, speed, item });
+    const star = createStarElement(item, idx);
+    star.style.left = `${px}px`;
+    star.style.top = `${py}px`;
+    starsContainer.appendChild(star);
 
     // Entry animation
-    gsap.fromTo(el, 
+    gsap.fromTo(star,
       { scale: 0, opacity: 0 },
-      { scale: 1, opacity: 1, duration: 0.8, delay: idx * 0.08, ease: 'elastic.out(1, 0.6)' }
+      { scale: 1, opacity: 1, duration: 0.8, delay: idx * 0.06, ease: 'elastic.out(1, 0.5)' }
     );
+
+    const baseSpeed = 0.0015;
+    const speed = (baseSpeed / (1 + Math.floor(idx / CONFIG.STARS_PER_RING) * 0.5)) * (idx % 2 === 0 ? 1 : -1);
+    orbitAnimations.push({ el: star, angle, radius, targetRadius: radius, speed, item });
   });
 }
 
-function createOrbitElement(item) {
-  const el = document.createElement('div');
-  el.className = 'orbit-item';
-  el.dataset.id = item.id;
+function createStarElement(item, rankIndex) {
+  const star = document.createElement('div');
+  star.className = 'star-element';
+  star.dataset.id = item.id;
 
-  if (item.photo_url) {
-    el.innerHTML = `
-      <div class="orbit-item-photo-wrapper">
-        <img class="orbit-item-photo" src="${item.photo_url}" alt="${item.label}" />
-      </div>
-      <span class="orbit-item-label">${item.label}</span>
-    `;
-  } else {
-    el.innerHTML = `
-      <div class="orbit-item-photo-wrapper">
-        <div class="orbit-item-star"></div>
-      </div>
-      <span class="orbit-item-label">${item.label}</span>
-    `;
-  }
+  // Tooltip on hover
+  star.addEventListener('mouseenter', () => {
+    const r = star.getBoundingClientRect();
+    if (item.photo_url) {
+      tooltipImg.src = item.photo_url;
+      tooltipImg.classList.remove('hidden');
+    } else {
+      tooltipImg.src = '';
+      tooltipImg.classList.add('hidden');
+    }
+    tooltipText.textContent = item.message || item.label || 'Kenangan di bintang.';
+    tooltip.style.left = `${r.left + r.width / 2}px`;
+    tooltip.style.top = `${r.top}px`;
+    tooltip.classList.remove('hidden');
+  });
 
-  el.addEventListener('click', (e) => {
+  star.addEventListener('mouseleave', () => {
+    tooltip.classList.add('hidden');
+  });
+
+  // Click to delete
+  star.addEventListener('click', async (e) => {
     e.stopPropagation();
-    showDetailPopup(item, el);
+    const label = item.label || item.message || 'bintang ini';
+    if (!confirm(`Hapus ${label}?`)) return;
+    await deleteStar(item.id, star);
   });
 
-  return el;
+  return star;
 }
 
-// ═══════════════════════════════════
-// ORBIT DETAIL POPUP
-// ═══════════════════════════════════
-let selectedOrbitItem = null;
-
-function showDetailPopup(item, el) {
-  selectedOrbitItem = item;
-
-  if (item.photo_url) {
-    detailPhoto.src = item.photo_url;
-    detailPhoto.classList.remove('hidden');
-  } else {
-    detailPhoto.classList.add('hidden');
-  }
-
-  detailLabel.textContent = item.label;
-  detailMessage.textContent = item.message || 'No message yet.';
-
-  // Position popup near the element
-  const rect = el.getBoundingClientRect();
-  const popupWidth = 260;
-  let left = rect.left + rect.width / 2 - popupWidth / 2;
-  let top = rect.top - 20;
-
-  // Keep in viewport
-  left = Math.max(10, Math.min(left, window.innerWidth - popupWidth - 10));
-  if (top < 200) {
-    top = rect.bottom + 20;
-  } else {
-    top = rect.top - detailPopup.offsetHeight - 20;
-  }
-
-  detailPopup.style.left = `${left}px`;
-  detailPopup.style.top = `${Math.max(10, top)}px`;
-  detailPopup.classList.remove('hidden');
-}
-
-function closeDetailPopup() {
-  detailPopup.classList.add('hidden');
-  selectedOrbitItem = null;
-}
-
-function onDetailEdit() {
-  if (!selectedOrbitItem) return;
-  closeDetailPopup();
-  openEditOrbitModal(selectedOrbitItem);
-}
-
-async function onDetailDelete() {
-  if (!selectedOrbitItem) return;
-  if (!confirm(`Delete "${selectedOrbitItem.label}"?`)) return;
-
-  const id = selectedOrbitItem.id;
-  closeDetailPopup();
-
+async function deleteStar(id, starEl) {
   try {
-    await api.deleteOrbitItem(id);
-    orbitItems = orbitItems.filter(i => i.id !== id);
-    renderOrbitRings();
-    renderOrbitItems();
-  } catch (e) {
-    console.error('Delete failed:', e);
-    alert('Failed to delete. Please try again.');
+    if (typeof id === 'number' || (typeof id === 'string' && !id.startsWith('local-'))) {
+      await api.deleteOrbitItem(id);
+    }
+    gsap.to(starEl, {
+      scale: 0,
+      opacity: 0,
+      duration: 0.4,
+      ease: 'power2.in',
+      onComplete: () => {
+        starEl.remove();
+        orbitAnimations = orbitAnimations.filter(o => o.item.id !== id);
+        orbitItems = orbitItems.filter(i => i.id !== id);
+        // Shift remaining stars target radius
+        orbitAnimations.forEach((o, idx) => {
+          o.targetRadius = getOrbitRadius(idx);
+        });
+        updateOrbitLines();
+      }
+    });
+  } catch (err) {
+    console.error('Delete failed:', err);
+    alert('Gagal menghapus: ' + err.message);
   }
 }
 
 // ═══════════════════════════════════
-// ORBIT MODAL (Add / Edit)
+// BOARDING PASS MODAL (First Commit)
 // ═══════════════════════════════════
-function openAddOrbitModal() {
-  editingOrbitId = null;
-  orbitPhotoFile = null;
-  orbitModalTitle.textContent = 'Add New Memory';
-  orbitSaveText.textContent = 'Add Star';
-  orbitLabelInput.value = '';
-  orbitMessageInput.value = '';
-  orbitPhotoPreview.src = '';
-  orbitPhotoPreview.classList.add('hidden');
-  orbitPhotoUploadBtn.classList.remove('hidden');
-  orbitModalOverlay.classList.remove('hidden');
-  orbitLabelInput.focus();
+function openBoardingPassModal() {
+  modalContainer.classList.remove('hidden');
+  gsap.set(modal, {
+    scale: 1, rotation: 0, skewX: 0, skewY: 0,
+    filter: 'blur(0px)', opacity: 1,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05)',
+    clearProps: 'transform'
+  });
+  modalContent.classList.remove('hidden');
+  modal.classList.remove('expanded');
+  modalLeftPanel.classList.add('hidden');
+  currentImageSrc = null;
+  currentImageFile = null;
+  previewImage.src = '';
+  messageInput.value = '';
+  messageInput.focus();
 }
 
-function openEditOrbitModal(item) {
-  editingOrbitId = item.id;
-  orbitPhotoFile = null;
-  orbitModalTitle.textContent = 'Edit Memory';
-  orbitSaveText.textContent = 'Save Changes';
-  orbitLabelInput.value = item.label;
-  orbitMessageInput.value = item.message || '';
-
-  if (item.photo_url) {
-    orbitPhotoPreview.src = item.photo_url;
-    orbitPhotoPreview.classList.remove('hidden');
-    orbitPhotoUploadBtn.classList.add('hidden');
-  } else {
-    orbitPhotoPreview.src = '';
-    orbitPhotoPreview.classList.add('hidden');
-    orbitPhotoUploadBtn.classList.remove('hidden');
-  }
-
-  orbitModalOverlay.classList.remove('hidden');
-  orbitLabelInput.focus();
-}
-
-function closeOrbitModal() {
-  orbitModalOverlay.classList.add('hidden');
-  editingOrbitId = null;
-  orbitPhotoFile = null;
-  orbitPhotoFile$.value = '';
-}
-
-function onOrbitPhotoSelect(e) {
+function onPhotoSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
-  orbitPhotoFile = file;
+  currentImageFile = file;
 
   const reader = new FileReader();
   reader.onload = (ev) => {
-    orbitPhotoPreview.src = ev.target.result;
-    orbitPhotoPreview.classList.remove('hidden');
-    orbitPhotoUploadBtn.classList.add('hidden');
+    currentImageSrc = ev.target.result;
+    previewImage.src = currentImageSrc;
+    modal.classList.add('expanded');
+    setTimeout(() => {
+      modalLeftPanel.classList.remove('hidden');
+      modalLeftPanel.style.display = 'flex';
+      setTimeout(() => { modalLeftPanel.style.opacity = '1'; }, 10);
+    }, 400);
   };
   reader.readAsDataURL(file);
 }
 
-async function saveOrbitItem() {
-  const label = orbitLabelInput.value.trim();
-  if (!label) {
-    orbitLabelInput.focus();
-    orbitLabelInput.style.borderColor = '#f87171';
-    setTimeout(() => { orbitLabelInput.style.borderColor = ''; }, 2000);
+// ═══════════════════════════════════
+// SEND MESSAGE (4-Stage Implosion & Flight Animation)
+// ═══════════════════════════════════
+async function onSendMessage() {
+  const text = messageInput.value.trim();
+  if (!text) {
+    alert('Silakan tulis pesan terlebih dahulu!');
+    messageInput.focus();
     return;
   }
 
-  const message = orbitMessageInput.value.trim();
+  const photoFile = currentImageFile;
+  const localImg = currentImageSrc;
 
-  // Show loading
-  orbitSaveText.classList.add('hidden');
-  orbitSaveLoading.classList.remove('hidden');
-  orbitModalSave.disabled = true;
+  // Origin coordinates from modal center
+  const rect = modal.getBoundingClientRect();
+  const startX = rect.left + rect.width / 2;
+  const startY = rect.top + rect.height / 2;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
 
+  // Stage 1 & 2: Modal skew, twist & blur into glowing vortex
+  const tl = gsap.timeline();
+
+  tl.to(modal, {
+    scale: 0.35,
+    rotation: 50,
+    skewX: 18,
+    skewY: 18,
+    filter: 'blur(10px)',
+    boxShadow: '0 0 120px 60px rgba(56, 189, 248, 0.9), inset 0 0 90px rgba(56, 189, 248, 1)',
+    duration: 0.5,
+    ease: 'power2.in',
+  })
+  .to(modal, {
+    scale: 0,
+    opacity: 0,
+    duration: 0.2,
+    ease: 'power4.in',
+    onStart: () => {
+      spawnVortexBurst(startX, startY);
+    },
+    onComplete: () => {
+      modalContainer.classList.add('hidden');
+
+      // Shift existing stars outward
+      orbitAnimations.forEach((s, idx) => {
+        s.targetRadius = getOrbitRadius(idx + 1);
+      });
+
+      // Stage 3: Glowing spark projectile shoots out
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+      spark.style.left = `${startX}px`;
+      spark.style.top = `${startY}px`;
+      document.body.appendChild(spark);
+
+      const radius = getOrbitRadius(0);
+      const angle = Math.random() * Math.PI * 2;
+      const targetX = cx + Math.cos(angle) * radius;
+      const targetY = cy + Math.sin(angle) * radius;
+
+      // Arc trajectory
+      gsap.to(spark, { x: targetX - startX, ease: 'power1.inOut', duration: 0.7 });
+      gsap.to(spark, {
+        y: targetY - startY,
+        ease: 'power3.in',
+        duration: 0.7,
+        onComplete: () => {
+          spark.remove();
+
+          // Stage 4: Star pops in with elastic ease!
+          const newMsg = {
+            id: 'local-' + Date.now(),
+            label: text.slice(0, 30),
+            message: text,
+            photo_url: localImg,
+          };
+
+          const star = createStarElement(newMsg, 0);
+          star.style.left = `${targetX}px`;
+          star.style.top = `${targetY}px`;
+          starsContainer.appendChild(star);
+
+          gsap.fromTo(star,
+            { scale: 0, opacity: 0 },
+            { scale: 1, opacity: 1, duration: 0.8, ease: 'elastic.out(1, 0.5)' }
+          );
+
+          const baseSpeed = 0.0015;
+          const speed = (baseSpeed / (1 + Math.floor(0 / CONFIG.STARS_PER_RING) * 0.5)) * (Math.random() > 0.5 ? 1 : -1);
+          orbitAnimations.unshift({ el: star, angle, radius, targetRadius: radius, speed, item: newMsg });
+          orbitItems.unshift(newMsg);
+          updateOrbitLines();
+
+          // Persist in background
+          persistStarInBackground(newMsg, photoFile);
+        },
+      });
+    },
+  });
+}
+
+function spawnVortexBurst(cx, cy) {
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('div');
+    p.className = 'spark';
+    p.style.width = '4px';
+    p.style.height = '4px';
+    p.style.left = `${cx}px`;
+    p.style.top = `${cy}px`;
+    document.body.appendChild(p);
+
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 50 + Math.random() * 100;
+    const dur = 0.35 + Math.random() * 0.35;
+
+    gsap.to(p, {
+      x: Math.cos(angle) * dist,
+      y: Math.sin(angle) * dist,
+      scale: 0,
+      opacity: 0,
+      duration: dur,
+      ease: 'power2.out',
+      onComplete: () => p.remove(),
+    });
+  }
+}
+
+async function persistStarInBackground(starData, photoFile) {
   try {
     let photoUrl = null;
-
-    // Upload photo if selected
-    if (orbitPhotoFile) {
-      const uploadResult = await api.uploadImage(orbitPhotoFile);
-      photoUrl = uploadResult.url;
+    if (photoFile) {
+      const uploadRes = await api.uploadImage(photoFile);
+      photoUrl = uploadRes.url;
+      starData.photo_url = photoUrl;
     }
-
-    if (editingOrbitId) {
-      // Update existing
-      const updateData = { label, message };
-      if (photoUrl) updateData.photo_url = photoUrl;
-      const updated = await api.updateOrbitItem(editingOrbitId, updateData);
-
-      // Update local state
-      const idx = orbitItems.findIndex(i => i.id === editingOrbitId);
-      if (idx >= 0) orbitItems[idx] = updated;
-    } else {
-      // Create new
-      const newItem = await api.createOrbitItem({
-        label,
-        message,
-        photo_url: photoUrl,
-      });
-      orbitItems.push(newItem);
-    }
-
-    // Re-render
-    renderOrbitRings();
-    renderOrbitItems();
-    closeOrbitModal();
-  } catch (e) {
-    console.error('Save orbit failed:', e);
-    alert(`Failed to save: ${e.message || 'Please try again.'}`);
-  } finally {
-    orbitSaveText.classList.remove('hidden');
-    orbitSaveLoading.classList.add('hidden');
-    orbitModalSave.disabled = false;
+    const created = await api.createOrbitItem({
+      label: starData.label,
+      message: starData.message,
+      photo_url: photoUrl,
+    });
+    starData.id = created.id;
+  } catch (err) {
+    console.warn('Background save to API skipped/offline:', err.message);
   }
 }
 
