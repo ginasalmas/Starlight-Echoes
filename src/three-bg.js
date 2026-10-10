@@ -39,12 +39,12 @@ export class CosmicBackground {
     // Renderer
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true,
       powerPreference: 'high-performance',
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(0x060d1f, 1);
+    this.renderer.setClearColor(0x000000, 0);
 
     this.container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.position = 'fixed';
@@ -348,6 +348,14 @@ export class CosmicBackground {
 
     this.camera.position.x = this.cameraPosition.x;
     this.camera.position.y = this.cameraPosition.y;
+
+    // Subtle deep-space parallax for the galaxy background image
+    if (!this.galaxyBackdrop) {
+      this.galaxyBackdrop = document.getElementById('galaxy-backdrop');
+    }
+    if (this.galaxyBackdrop) {
+      this.galaxyBackdrop.style.transform = `translate3d(${-this.cameraPosition.x * 0.02}px, ${this.cameraPosition.y * 0.02}px, 0)`;
+    }
 
     // Update star layers
     this.starLayers.forEach(layer => {
