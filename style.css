@@ -51,7 +51,7 @@ body {
   left: -8%;
   width: 116%;
   height: 116%;
-  background-image: 
+  background-image:
     radial-gradient(circle at center, rgba(6, 13, 31, 0.3) 0%, rgba(6, 13, 31, 0.8) 100%),
     url('/galaxy-bg.png');
   background-size: cover;
@@ -110,7 +110,9 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ═══════════════════════════════════
@@ -154,6 +156,7 @@ body {
     opacity: 0;
     transform: translateY(30px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -390,7 +393,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(56, 189, 248, 0.08);
+  border: 3px solid rgba(56, 189, 248, 0.08);
   border-radius: 50%;
   box-shadow:
     0 0 15px rgba(56, 189, 248, 0.03),
@@ -399,8 +402,13 @@ body {
 }
 
 @keyframes orbitPulse {
-  from { border-color: rgba(56, 189, 248, 0.06); }
-  to { border-color: rgba(56, 189, 248, 0.12); }
+  from {
+    border-color: rgba(56, 189, 248, 0.06);
+  }
+
+  to {
+    border-color: rgba(56, 189, 248, 0.12);
+  }
 }
 
 /* ═══════════════════════════════════
@@ -433,21 +441,21 @@ body {
   position: absolute;
   inset: -8px;
   border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(56, 189, 248, 0.4),
-    rgba(125, 211, 252, 0.1),
-    rgba(56, 189, 248, 0.3),
-    rgba(125, 211, 252, 0.1),
-    rgba(56, 189, 248, 0.4)
-  );
+  background: conic-gradient(from 0deg,
+      rgba(56, 189, 248, 0.4),
+      rgba(125, 211, 252, 0.1),
+      rgba(56, 189, 248, 0.3),
+      rgba(125, 211, 252, 0.1),
+      rgba(56, 189, 248, 0.4));
   animation: glowRotate 10s linear infinite;
   filter: blur(6px);
   z-index: 0;
 }
 
 @keyframes glowRotate {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Static glow */
@@ -569,7 +577,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  border: 1px dashed rgba(56, 189, 248, 0.16);
+  border: 3px dashed rgba(56, 189, 248, 0.16);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -668,12 +676,20 @@ body {
   width: 100%;
   height: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
+  padding-right: clamp(30px, calc(25vw - 160px), 260px);
   z-index: 200;
   perspective: 1200px;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 900px) {
+  #message-modal-container {
+    justify-content: center;
+    padding-right: 0;
+  }
 }
 
 #message-modal-container.hidden {
@@ -913,13 +929,16 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(56, 189, 248, 0.2);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.4);
 }
@@ -928,4 +947,56 @@ body {
 ::selection {
   background: rgba(56, 189, 248, 0.3);
   color: #fff;
+}
+
+/* ═══════════════════════════════════
+   TOAST CHIP NOTIFICATIONS
+   ═══════════════════════════════════ */
+#toast-container {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  background: rgba(10, 17, 40, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 999px;
+  color: #e0f2fe;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+.toast-chip .toast-icon {
+  color: #38bdf8;
+  font-size: 1.1rem;
+  text-shadow: 0 0 10px #38bdf8;
+}
+
+.toast-chip.error {
+  border-color: rgba(248, 113, 113, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(248, 113, 113, 0.3);
+}
+
+.toast-chip.error .toast-icon {
+  color: #f87171;
+  text-shadow: 0 0 10px #f87171;
 }

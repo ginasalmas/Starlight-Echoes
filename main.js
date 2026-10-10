@@ -74,7 +74,6 @@ const photoUpload = $('photo-upload');
 const previewImage = $('preview-image');
 const sendBtn = $('send-btn');
 const messageInput = $('message-input');
-const skipLoginBtn = $('skip-login-btn');
 
 // Tooltip
 const tooltip = $('star-tooltip');
@@ -163,25 +162,22 @@ async function showApp() {
   canvasWorld.classList.remove('hidden');
 
   // Populate user info
-  userDisplayName.textContent = currentUser.displayName;
-  if (currentUser.avatarUrl) {
-    userAvatar.src = currentUser.avatarUrl;
-  }
+  userDisplayName.textContent = currentUser.displayName || 'User';
+  userAvatar.src = currentUser.avatarUrl || '/default-avatar.jpg';
 
   // Load canvas data
   try {
     canvasData = await api.getCanvas();
     diaryTitleText.textContent = canvasData.title_text || 'Starlight Echoes';
     centerName.textContent = canvasData.center_name || 'My Universe';
-    if (canvasData.center_photo_url) {
-      centerPhoto.src = canvasData.center_photo_url;
-    }
+    centerPhoto.src = canvasData.center_photo_url || '/default-avatar.jpg';
     if (canvasData.pan_x || canvasData.pan_y) {
       targetPanX = canvasData.pan_x || 0;
       targetPanY = canvasData.pan_y || 0;
     }
   } catch (e) {
     console.warn('Could not load canvas:', e.message);
+    centerPhoto.src = '/default-avatar.jpg';
   }
 
   // Load orbit items
@@ -202,18 +198,6 @@ function setupEventListeners() {
   googleLoginBtn.addEventListener('click', () => {
     window.location.href = api.getLoginUrl();
   });
-
-  // --- Skip Login (Dev Mode) ---
-  if (skipLoginBtn) {
-    skipLoginBtn.addEventListener('click', () => {
-      currentUser = { displayName: 'Dev User', avatarUrl: '' };
-      canvasData = { title_text: 'Dev Mode Diary', center_name: 'Local Universe' };
-      orbitItems = [
-        { id: 1, label: 'First Memory', message: 'Hello from dev mode!', photo_url: null }
-      ];
-      showApp();
-    });
-  }
 
   // --- Logout ---
   logoutBtn.addEventListener('click', async () => {
@@ -307,9 +291,45 @@ function onPanEnd() {
 }
 
 // ═══════════════════════════════════
+// TOAST CHIP NOTIFICATIONS
+// ═══════════════════════════════════
+function showToast(message, type = 'success') {
+  let toastContainer = document.getElementById('toast-container');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    document.body.appendChild(toastContainer);
+  }
+
+  const chip = document.createElement('div');
+  chip.className = `toast-chip ${type}`;
+  chip.innerHTML = `
+    <span class="toast-icon">${type === 'error' ? '✕' : '✦'}</span>
+    <span class="toast-text">${message}</span>
+  `;
+  toastContainer.appendChild(chip);
+
+  gsap.fromTo(chip,
+    { opacity: 0, y: -20, scale: 0.9 },
+    { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: 'back.out(1.5)' }
+  );
+
+  setTimeout(() => {
+    gsap.to(chip, {
+      opacity: 0,
+      y: -15,
+      scale: 0.95,
+      duration: 0.3,
+      ease: 'power2.in',
+      onComplete: () => chip.remove()
+    });
+  }, 2500);
+}
+
+// ═══════════════════════════════════
 // INLINE EDITING
 // ═══════════════════════════════════
-function startInlineEdit(displayEl, inputEl, onSave) {
+function startInlineEdit(displayEl, inputEl, onSave, itemType = 'Nama') {
   const currentValue = displayEl.textContent;
   inputEl.value = currentValue;
   displayEl.classList.add('hidden');
@@ -321,14 +341,19 @@ function startInlineEdit(displayEl, inputEl, onSave) {
     const newValue = inputEl.value.trim() || currentValue;
     inputEl.classList.add('hidden');
     displayEl.classList.remove('hidden');
-    displayEl.textContent = newValue;
     inputEl.removeEventListener('blur', finish);
     inputEl.removeEventListener('keydown', onKeydown);
+
+    if (newValue === currentValue) return;
+
+    displayEl.textContent = newValue;
     try {
       await onSave(newValue);
+      showToast(`${itemType} berhasil diperbarui`);
     } catch (e) {
       console.error('Save failed:', e);
       displayEl.textContent = currentValue;
+      showToast(`Gagal menyimpan: ${e.message}`, 'error');
     }
   };
 
@@ -358,9 +383,10 @@ async function onCenterPhotoChange(e) {
     const { url } = await api.uploadImage(file);
     centerPhoto.src = url;
     await api.updateCanvas({ center_photo_url: url });
+    showToast('Foto profil berhasil diperbarui');
   } catch (err) {
     console.error('Upload failed:', err);
-    alert(`Failed to upload photo: ${err.message || 'Please try again.'}`);
+    showToast(`Gagal mengunggah foto: ${err.message || 'Coba lagi'}`, 'error');
   }
 
   centerPhotoUpload.value = '';
