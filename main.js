@@ -1,6 +1,7 @@
 import { CosmicBackground } from './src/three-bg.js';
 import * as api from './src/api.js';
 import gsap from 'gsap';
+import { inject } from '@vercel/analytics';
 
 // ═══════════════════════════════════
 // CONFIGURATION
@@ -759,4 +760,5 @@ async function persistStarInBackground(starData, photoFile) {
 // ═══════════════════════════════════
 // BOOT
 // ═══════════════════════════════════
+inject();
 init();
